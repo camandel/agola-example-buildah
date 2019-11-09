@@ -1,0 +1,93 @@
+version: v0
+
+## Just use one of the provided run definitions. The first one will just build
+## the image. The second one will also push the image to dockerhub
+
+runs:
+
+## This run will just build (without pushing) a go program and a docker image
+  - name: build image
+    tasks:
+      - name: build
+        runtime:
+          containers:
+            - image: golang:1.13-buster
+        steps:
+          - clone:
+          - run:
+              name: build the program
+              command: go build .
+          # Copy the built binary and the Dockerfile to the workspace
+          - save_to_workspace:
+              contents:
+                - source_dir: .
+                  dest_dir: /bin/
+                  paths:
+                    - agola-example-buildah
+                - source_dir: .
+                  dest_dir: /
+                  paths:
+                    - Dockerfile
+      - name: build docker image
+        runtime:
+          containers:
+            - image: quay.io/buildah/stable
+              privileged: true
+        steps:
+          - restore_workspace:
+              dest_dir: .
+          - run:
+              name: create image
+              command:  buildah bud --format docker -t user/image:tag .
+          - run:
+              name: push image
+              command:  buildah push --creds=$DOCKERAUTH user/image:tag
+        depends:
+          - build
+
+
+## This run will build and push a go program and a docker image. It requires
+## that a secret and variable called `DOCKERAUTH` is defined inside the agola
+## project definition
+
+  # - name: build image
+  #   tasks:
+  #     - name: build
+  #       runtime:
+  #         containers:
+  #           - image: golang:1.13-buster
+  #       steps:
+  #         - clone:
+  #         - run:
+  #             name: build the program
+  #             command: go build .
+  #         # Copy the built binary and the Dockerfile to the workspace
+  #         - save_to_workspace:
+  #             contents:
+  #               - source_dir: .
+  #                 dest_dir: /bin/
+  #                 paths:
+  #                   - agola-example-buildah
+  #               - source_dir: .
+  #                 dest_dir: /
+  #                 paths:
+  #                   - Dockerfile
+  #     - name: build docker image
+  #       runtime:
+  #         containers:
+  #           - image: quay.io/buildah/stable
+  #             privileged: true
+  #       steps:
+  #         - restore_workspace:
+  #             dest_dir: .
+  #         - run:
+  #             name: create image
+  #             command:  buildah bud --format docker -t user/image:tag .
+  #         - run:
+  #             name: push image
+  #             command:  buildah push --creds=$DOCKERAUTH user/image:tag
+  #             environment:
+  #               DOCKERAUTH:
+  #                 from_variable: dockerauth
+  #       depends:
+  #         - build
